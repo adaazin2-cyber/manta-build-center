@@ -1,9 +1,84 @@
 name: Build APK
 
-# Masukkan pemicu di sini
 on:
-  workflow_dispatch: # Tambahkan baris ini agar bisa dijalankan manual
-  push:
-    branches:
-      - main
-      
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Build Mode (e.g., standard, advanced)'
+        required: false
+        default: 'standard'
+      zip_url:
+        description: 'URL to the source code ZIP file'
+        required: true
+        default: ''
+      tag:
+        description: 'Version Tag'
+        required: false
+        default: 'v1.0.0'
+      build_type:
+        description: 'Build Type (debug or release)'
+        required: false
+        default: 'debug'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Log Inputs
+        run: |
+          echo "Executing build with the following parameters:"
+          echo "Mode: ${{ github.event.inputs.mode }}"
+          echo "ZIP URL: ${{ github.event.inputs.zip_url }}"
+          echo "Tag: ${{ github.event.inputs.tag }}"
+          echo "Build Type: ${{ github.event.inputs.build_type }}"
+
+      - name: Download and Extract Source Code
+        run: |
+          if [ -n "${{ github.event.inputs.zip_url }}" ]; then
+            echo "Downloading source code from external ZIP..."
+            curl -L "${{ github.event.inputs.zip_url }}" -o source.zip
+            unzip -o source.zip -d .
+          else
+            echo "No ZIP URL provided, using repository files."
+          fi
+
+      - name: Grant Execute Permission for Gradle
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+          else
+            echo "Warning: gradlew not found in the root directory."
+          fi
+
+      - name: Build Android App
+        run: |
+          if [ -f "./gradlew" ]; then
+            if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+              ./gradlew assembleRelease
+            else
+              ./gradlew assembleDebug
+            fi
+          else
+            echo "Error: No gradle build script found. Cannot compile APK."
+            exit 1
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build-${{ github.event.inputs.tag }}
+          path: |
+            **/build/outputs/apk/**/*.apk
+            
