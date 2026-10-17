@@ -1,1 +1,9 @@
+name: Build APK
 
+# Masukkan pemicu di sini
+on:
+  workflow_dispatch: # Tambahkan baris ini agar bisa dijalankan manual
+  push:
+    branches:
+      - main
+      
